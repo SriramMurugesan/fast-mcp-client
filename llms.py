@@ -96,7 +96,7 @@ class OpenAIClient(LLMClient):
         return {
             "role": "tool",
             "tool_call_id": tool_call.id,
-            "content": tool_result.content
+            "content": tool_result.content if hasattr(tool_result, "content") else tool_result
         } 
     
 class AnthropicClient(LLMClient):
@@ -148,7 +148,7 @@ class AnthropicClient(LLMClient):
                 {
                     "type": "tool_result",
                     "tool_use_id": tool_call.id,
-                    "content": tool_result.content
+                    "content": tool_result.content if hasattr(tool_result, "content") else tool_result
                 }
             ]
         } 
@@ -213,7 +213,7 @@ class GeminiClient(LLMClient):
                 {
                     "type": "tool_result",
                     "tool_use_id": tool_call.id,
-                    "content": tool_result.content
+                    "content": tool_result.content if hasattr(tool_result, "content") else tool_result
                 }
             ]
         }

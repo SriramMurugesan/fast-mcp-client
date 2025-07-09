@@ -150,7 +150,8 @@ async def process_query(query: Query):
         # Process response and handle tool calls
         responses = []
 
-        while True:
+        MAX_STEPS = 4  # safety guard against infinite LLM/tool loops
+        for _ in range(MAX_STEPS):
             print(messages)
             print()
 
@@ -194,7 +195,13 @@ async def process_query(query: Query):
                     gemini_messages.append(flatten_to_string(msg["content"]))
                 else:
                     gemini_messages.append(flatten_to_string(msg))
-            response = await llm_client.create_message(gemini_messages)
+
+            try:
+                response = await llm_client.create_message(gemini_messages)
+            except Exception as e:
+                # Gracefully handle LLM errors (e.g. Gemini quota exceeded) and surface them to the user
+                responses.append(f"[LLM error] {e}")
+                break
             print(response)
             print()
 
@@ -233,6 +240,14 @@ async def process_query(query: Query):
 
                 tool_result_msg = llm_client.parse_tool_result(tool_call=tool_call, tool_result=tool_result)
                 messages.append(tool_result_msg)
+
+                # Stop further LLM-tool cycles once the first tool result is obtained
+                conversations[conv_id] = messages
+                return {
+                    "conversation_id": conv_id,
+                    "responses": responses,
+                    "messages": messages
+                }
 
         # Persist updated messages
         conversations[conv_id] = messages

@@ -1,13 +1,18 @@
 {
   "mcpServers": {
     
-    "gdrive": {
-      "command": "node",
-      "args": ["/home/sriram/Sriram_repos/gdrive-mcp-server/dist/index.js"],
-      "env": {
-        "GOOGLE_APPLICATION_CREDENTIALS": "/home/sriram/Sriram_repos/gdrive-mcp-server/credentials/gcp-oauth.keys.json",
-        "MCP_GDRIVE_CREDENTIALS": "/home/sriram/Sriram_repos/gdrive-mcp-server/credentials/.gdrive-server-credentials.json"
-      }
+    "gsuite-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@smithery/cli@latest",
+        "run",
+        "@rishipradeep-think41/gsuite-mcp",
+        "--key",
+        "be4222ff-652a-45d5-9a93-56a29a6f3c55",
+        "--config",
+        "\"{\\\"googleClientId\\\":\\\"57866692906-ar7ud9evvl1ijgo120d2od7005epo9l8.apps.googleusercontent.com\\\",\\\"googleClientSecret\\\":\\\"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\\\",\\\"googleRefreshToken\\\":\\\"1//0gbX0YbrGLQkPCgYIARAAGBASNwF-L9Ir-gJAi82DbfGEyAbP8f6x5iR2k_MnvsgxcvjX0ABcKpuGD-LtFr3EgMM0L1MAoZdqnHs\\\"}\""
+      ]
     }
   }
 }
