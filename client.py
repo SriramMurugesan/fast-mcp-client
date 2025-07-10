@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 import json
 from typing import Dict, List, Optional
@@ -10,20 +10,16 @@ import os
 from dotenv import load_dotenv
 import re
 import uuid
+from fastapi.security import OAuth2PasswordBearer
 
-
-from abc import ABC, abstractmethod
-# from anthropic import Anthropic
-# from openai import OpenAI
-
-from llms import AnthropicClient, OpenAIClient,GeminiClient
+from llms import AnthropicClient, OpenAIClient, GeminiClient
 
 # Load environment variables
 load_dotenv()
 
 app = FastAPI()
 
-# In-memory conversation store {conversation_id: List[messages]}
+# In-memory conversation store
 conversations: Dict[str, List[Dict]] = {}
 
 class Query(BaseModel):
@@ -36,7 +32,7 @@ class ServerConfig:
         self.args = args
         self.env = env
 
-def load_server_config_secrets(config): 
+def load_server_config_secrets(config):
     placeholder_pattern = re.compile(r"^<(.+)>$")
     if isinstance(config, dict):
         return {k: load_server_config_secrets(v) for k, v in config.items()}
@@ -45,8 +41,8 @@ def load_server_config_secrets(config):
     elif isinstance(config, str):
         match = placeholder_pattern.match(config)
         if match:
-            env_var = match.group(1)  # Extract placeholder name
-            return os.getenv(env_var, f"<{env_var}_NOT_SET>")  # Default if env variable not found
+            env_var = match.group(1)
+            return os.getenv(env_var, f"<{env_var}_NOT_SET>")
     return config
 
 def load_server_configs(config_path: str) -> Dict[str, ServerConfig]:
@@ -124,7 +120,7 @@ class MCPClientManager:
         except Exception as e:
             return f"Error executing tool: {str(e)}"
 
-# Load server configurations from JSON file
+# Load MCP server configs
 MCP_SERVERS = load_server_configs('server_config.json')
 mcp_client_manager = MCPClientManager(MCP_SERVERS)
 
@@ -137,44 +133,38 @@ async def startup_event():
 async def shutdown_event():
     await mcp_client_manager.shutdown()
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
 @app.post("/query")
-async def process_query(query: Query):
+async def process_query(query: Query, token: str = Depends(oauth2_scheme)):
     try:
-                # Conversation handling
         conv_id = query.conversation_id or str(uuid.uuid4())
         if conv_id not in conversations:
             conversations[conv_id] = []
         messages = conversations[conv_id]
         messages.append({"role": "user", "content": query.text})
 
-        # Process response and handle tool calls
         responses = []
+        MAX_STEPS = 4
 
-        MAX_STEPS = 4  # safety guard against infinite LLM/tool loops
         for _ in range(MAX_STEPS):
-            print(messages)
-            print()
-
-            # llm_client = AnthropicClient(api_key=os.getenv("ANTHROPIC_API_KEY"), tools=mcp_client_manager.tools)
-            # llm_client = OpenAIClient(api_key=os.getenv("OPENAI_API_KEY"), tools=mcp_client_manager.tools)
-            # Convert MCP tool dicts to Gemini function declarations
-            function_declarations = []
             from schema_utils import clean_openapi_schema
-            for tool in mcp_client_manager.tools:
-                if all(k in tool for k in ("name", "description", "input_schema")):
-                    # Clean input_schema for Gemini compatibility
-                    input_schema = clean_openapi_schema(tool["input_schema"])
-                    function_declarations.append({
-                        "name": tool["name"],
-                        "description": tool["description"],
-                        "parameters": input_schema
-                    })
-            llm_client = GeminiClient(api_key=os.getenv('GEMINI_API_KEY'), function_declarations=function_declarations)
+            function_declarations = [
+                {
+                    "name": tool["name"],
+                    "description": tool["description"],
+                    "parameters": clean_openapi_schema(tool["input_schema"])
+                }
+                for tool in mcp_client_manager.tools
+                if all(k in tool for k in ("name", "description", "input_schema"))
+            ]
 
-            
-            # Helper to flatten any object to a string before sending to Gemini
+            llm_client = GeminiClient(
+                api_key=os.getenv('GEMINI_API_KEY'),
+                function_declarations=function_declarations
+            )
+
             def flatten_to_string(obj):
-                # Special case: list of dicts with 'type': 'tool_result'
                 if isinstance(obj, list):
                     if all(isinstance(x, dict) and x.get('type') == 'tool_result' for x in obj):
                         return "\n".join(flatten_to_string(x.get('content', '')) for x in obj)
@@ -188,75 +178,62 @@ async def process_query(query: Query):
                 else:
                     return str(obj)
 
-            # Gemini expects messages as a list of strings or list of {'text': ...}
-            gemini_messages = []
-            for msg in messages:
-                if isinstance(msg, dict) and "content" in msg:
-                    gemini_messages.append(flatten_to_string(msg["content"]))
-                else:
-                    gemini_messages.append(flatten_to_string(msg))
+            gemini_messages = [
+                flatten_to_string(msg["content"]) if isinstance(msg, dict) and "content" in msg else flatten_to_string(msg)
+                for msg in messages
+            ]
 
-            try:
-                response = await llm_client.create_message(gemini_messages)
-            except Exception as e:
-                # Gracefully handle LLM errors (e.g. Gemini quota exceeded) and surface them to the user
-                responses.append(f"[LLM error] {e}")
-                break
-            print(response)
-            print()
-
+            response = await llm_client.create_message(gemini_messages)
             parsed_response = llm_client.parse_response(response)
 
-            print(parsed_response)
-            print()
-
-            # Append Gemini-compatible tool result message using helper defined above
-            if parsed_response.content and isinstance(parsed_response.content, dict) and parsed_response.content.get("content"):
-                content = parsed_response.content["content"]
-                messages.append(flatten_to_string(content))
-            else:
+            if parsed_response.content:
                 messages.append(flatten_to_string(parsed_response.content))
-            if parsed_response.text_content:
-                responses.extend(parsed_response.text_content)
 
-            if not parsed_response.tool_calls: 
+            if parsed_response.text_content:
+                formatted_responses = []
+                for text in parsed_response.text_content:
+                    match = re.search(r"https://drive\.google\.com/\S+", text)
+                    if match:
+                        url = match.group()
+                        text = text.replace(url, f"[Click to view file]({url})")
+                    formatted_responses.append(text)
+                responses.extend(formatted_responses)
+
+            if not parsed_response.tool_calls:
                 break
-            
+
             for tool_call in parsed_response.tool_calls:
                 tool_name = tool_call.name
                 tool_args = tool_call.input
 
-                # Find the correct server name for the tool
                 tool_info = next(tool for tool in mcp_client_manager.tools if tool["name"] == tool_name)
                 server_name = tool_info["server"]
 
-                # Execute tool call
                 tool_result = await mcp_client_manager.execute_tool(
                     server_name=server_name,
-                    tool_name=tool_name, 
-                    arguments=tool_args)
+                    tool_name=tool_name,
+                    arguments=tool_args
+                )
 
                 responses.append(f"[Calling tool {tool_name} with args {tool_args}]")
+
+                # 🔗 Manual link injection for drive_share
+                if tool_name == "drive_share" and "fileId" in tool_args:
+                    file_id = tool_args["fileId"]
+                    link = f"https://drive.google.com/file/d/{file_id}/view?usp=sharing"
+                    responses.append(f"[Click to view file]({link})")
+                    messages.append({"role": "assistant", "content": link})
 
                 tool_result_msg = llm_client.parse_tool_result(tool_call=tool_call, tool_result=tool_result)
                 messages.append(tool_result_msg)
 
-                # Stop further LLM-tool cycles once the first tool result is obtained
-                conversations[conv_id] = messages
-                return {
-                    "conversation_id": conv_id,
-                    "responses": responses,
-                    "messages": messages
-                }
-
-        # Persist updated messages
         conversations[conv_id] = messages
         return {
             "conversation_id": conv_id,
             "responses": responses,
             "messages": messages
         }
-        
+
     except Exception as e:
         import traceback
         traceback.print_exc()
