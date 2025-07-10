@@ -16,10 +16,25 @@ from sqlalchemy.orm import Session, sessionmaker
 # DATABASE INITIALISATION
 # ---------------------------------------------------------------------------
 
-DB_PATH = os.getenv("AUTH_DB_PATH", "users.db")
-DB_URL = f"sqlite:///{DB_PATH}"
+POSTGRES_URL = os.getenv(
+    "POSTGRES_URL",
+    "postgresql+psycopg2://postgres.gjisahaenkruawxhntkb:8PIfilU6x82HE7bq@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&supa=base-pooler.x",
+)
+from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 
-engine = create_engine(DB_URL, connect_args={"check_same_thread": False})
+url_parts = urlsplit(POSTGRES_URL)
+if url_parts.scheme.startswith("postgresql"):
+    # Sanitize the URL: remove unknown query params (e.g., 'supa') that psycopg2 rejects.
+    qs = dict(parse_qsl(url_parts.query))
+    allowed_params = {k: v for k, v in qs.items() if k in {"sslmode", "application_name"}}
+    cleaned_query = urlencode(allowed_params)
+    DB_URL = urlunsplit((url_parts.scheme, url_parts.netloc, url_parts.path, cleaned_query, url_parts.fragment))
+else:
+    # For other schemes (e.g., sqlite for tests), keep the URL untouched.
+    DB_URL = POSTGRES_URL
+
+# For PostgreSQL, no special SQLite connect_args are needed
+engine = create_engine(DB_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 Base = declarative_base()

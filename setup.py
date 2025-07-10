@@ -5,6 +5,7 @@ setup(
     version="0.1",
     packages=find_packages(),
     install_requires=[
-        # Add your project's dependencies here
+        "SQLAlchemy>=1.4",
+        "psycopg2-binary>=2.9",
     ],
 )
