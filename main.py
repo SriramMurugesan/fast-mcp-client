@@ -1,13 +1,7 @@
-"""
-Run with:
-    python main.py
-or
-    uvicorn main:app --reload
-"""
 from __future__ import annotations
 
 import os
-
+import client
 from client import app  # existing FastAPI application
 
 import auth_setup  # side-effect: attach auth & middleware
@@ -18,15 +12,12 @@ from fastapi_mcp import FastApiMCP, AuthConfig
 import auth_setup as auth  # alias for clarity
 
 
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
 
 mcp = FastApiMCP(
     app,
     include_operations=[
         # Auth operations
+        "query",
         "register",
         "login",
         "read_users_me",
@@ -40,3 +31,8 @@ mcp = FastApiMCP(
         dependencies=[Depends(auth._get_current_user)],
     ),
 )
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))

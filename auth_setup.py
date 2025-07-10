@@ -186,7 +186,7 @@ def read_users(current_user: User = Depends(_get_current_user)):
 # MIDDLEWARE TO PROTECT /query ENDPOINT
 # ---------------------------------------------------------------------------
 
-def _auth_middleware_factory(app: FastAPI,operation_id: str):
+def _auth_middleware_factory(app: FastAPI):
     """Return middleware function that checks JWT for /query."""
 
     async def auth_middleware(request: Request, call_next):

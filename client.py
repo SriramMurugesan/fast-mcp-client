@@ -135,7 +135,7 @@ async def shutdown_event():
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
-@app.post("/query")
+@app.post("/query", operation_id="query")
 async def process_query(query: Query, token: str = Depends(oauth2_scheme)):
     try:
         conv_id = query.conversation_id or str(uuid.uuid4())
