@@ -154,11 +154,19 @@ def register(user_in: UserCreate):
     return Token(access_token=token)
 
 
-@auth_router.post("/login", response_model=Token,operation_id="login")
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    user_row = _db_get_user(form_data.username)
-    if user_row is None or not _verify_password(form_data.password, user_row.hashed_password):
+class LoginInput(BaseModel):
+    """Schema for login credentials sent as JSON body."""
+    username: str
+    password: str
+
+
+@auth_router.post("/login", response_model=Token, operation_id="login")
+def login(credentials: LoginInput):
+    """Authenticate user using JSON body containing `username` and `password`."""
+    user_row = _db_get_user(credentials.username)
+    if user_row is None or not _verify_password(credentials.password, user_row.hashed_password):
         raise HTTPException(status_code=401, detail="Incorrect username or password")
+
     token = _create_access_token({"sub": user_row.username})
     return Token(access_token=token)
 

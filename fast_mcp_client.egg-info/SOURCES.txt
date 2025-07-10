@@ -1,8 +1,0 @@
-README.md
-setup.py
-fast_mcp_client.egg-info/PKG-INFO
-fast_mcp_client.egg-info/SOURCES.txt
-fast_mcp_client.egg-info/dependency_links.txt
-fast_mcp_client.egg-info/top_level.txt
-tools/__init__.py
-tools/gdrive_search.py
