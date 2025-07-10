@@ -26,6 +26,18 @@
             "--profile",
             "alleged-mollusk-VH4v7j"
           ]
-        }
+        },
+        "fastapi-mcp-client": {
+          "command": "npx",
+          "args": [
+            "mcp-remote",
+            "http://localhost:8001/mcp",
+              "--header",
+              "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJTcmkiLCJleHAiOjE3NTIyNDIzMjd9.9PzGqHVIEcLeo2w3tPNVJhzC_CHKLOx0ECT-x3N33DU",
+              "--header",
+              "Content-Type: application/json"
+            ]
+          }
+    
     }
   }
