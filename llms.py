@@ -93,11 +93,40 @@ class OpenAIClient(LLMClient):
         return parsed_response
     
     def parse_tool_result(self, tool_call, tool_result) -> Dict:
+        """Convert raw tool result into a chat message the LLM can understand.
+
+        If the tool was `drive_file_metadata`, synthesise a shareable Google Drive
+        link so the assistant can hand it back to the user easily.
+        """
+        # Default payload
+        content: Any = tool_result.content if hasattr(tool_result, "content") else tool_result
+
+        # Special-case Google Drive files – build a direct view link if we have the ID
+        if tool_call.name == "drive_file_metadata":
+            try:
+                file_id = None
+                # tool_result may be dict-like or an object with attributes
+                if isinstance(content, dict):
+                    file_id = content.get("id") or content.get("fileId")
+                if not file_id and hasattr(content, "id"):
+                    file_id = getattr(content, "id")
+                if file_id:
+                    view_link = f"https://drive.google.com/file/d/{file_id}/view"
+                    # Embed both ID and link so the assistant can choose
+                    content = {
+                        **(content if isinstance(content, dict) else {}),
+                        "drive_file_id": file_id,
+                        "drive_view_link": view_link,
+                    }
+            except Exception:
+                # Fail gracefully – return original content
+                pass
+
         return {
             "role": "tool",
             "tool_call_id": tool_call.id,
-            "content": tool_result.content if hasattr(tool_result, "content") else tool_result
-        } 
+            "content": content,
+        }
     
 class AnthropicClient(LLMClient):
 

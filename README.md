@@ -22,7 +22,7 @@ A FastAPI application implementing MCP (Model Control Protocol) Client for LLM i
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/fast-mcp-client.git
+   git clone https://github.com/SriramMurugesan/fast-mcp-client.git
    cd fast-mcp-client
    ```
 
@@ -39,7 +39,7 @@ A FastAPI application implementing MCP (Model Control Protocol) Client for LLM i
 
 4. Set up environment variables:
    ```bash
-   cp .env.example .env
+   cp .env
    # Edit .env with your configuration
    ```
 

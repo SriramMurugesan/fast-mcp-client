@@ -33,7 +33,7 @@
             "mcp-remote",
             "http://localhost:8001/mcp",
               "--header",
-              "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJTcmkiLCJleHAiOjE3NTIyNDIzMjd9.9PzGqHVIEcLeo2w3tPNVJhzC_CHKLOx0ECT-x3N33DU",
+              "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJTcmkiLCJleHAiOjE3NTIyNjMwMTZ9.ieVwgxjHQXeFw29F96BjxvsQIecB7PR-w-QudtKyP38",
               "--header",
               "Content-Type: application/json"
             ]
