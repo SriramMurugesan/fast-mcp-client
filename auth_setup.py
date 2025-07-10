@@ -162,10 +162,7 @@ class LoginInput(BaseModel):
 
 @auth_router.post("/login", response_model=Token, operation_id="login")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    """Authenticate user via **application/x-www-form-urlencoded** body containing
-    `username` and `password` fields (standard OAuth2 password grant).
-    This restores the original behaviour expected by legacy clients.
-    """
+    
 
     user_row = _db_get_user(form_data.username)
     if user_row is None or not _verify_password(form_data.password, user_row.hashed_password):
