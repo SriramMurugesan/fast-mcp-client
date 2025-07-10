@@ -5,7 +5,7 @@ import sys
 import pytest
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def auth_db():
     """Provide the db_backend_sqlalchemy module wired to an in-memory SQLite DB.
 

@@ -56,22 +56,42 @@ class Token(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# STORAGE HELPERS  (very light-weight JSON file storage)
+# STORAGE HELPERS (backed by PostgreSQL via SQLAlchemy)
 # ---------------------------------------------------------------------------
 
+from db_backend_sqlalchemy import (
+    create_user as _db_create_user,
+    get_user as _db_get_user,
+    update_user as _db_update_user,
+    delete_user as _db_delete_user,
+    SessionLocal as _SessionLocal,
+    UserModel as _UserModel,
+)
+
+
 def _load_users() -> dict[str, User]:
-    if USERS_FILE.exists():
-        with USERS_FILE.open("r", encoding="utf-8") as f:
-            raw = json.load(f)
-        return {u["username"]: User(**u) for u in raw}
-    return {}
+    """Return all users from the DB as a dict keyed by username."""
+    with _SessionLocal() as db:
+        users = db.query(_UserModel).all()
+        return {u.username: User(username=u.username, email=u.email, hashed_password=u.hashed_password) for u in users}
 
 
-def _save_users(users: dict[str, User]) -> None:
-    USERS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    serialisable = [u.dict() for u in users.values()]
-    with USERS_FILE.open("w", encoding="utf-8") as f:
-        json.dump(serialisable, f, indent=2)
+def _save_user(user: User):
+    """Upsert a user inside the database (helper for register / update)."""
+    existing = _db_get_user(user.username)
+    if existing:
+        _db_update_user(user.username, email=user.email, hashed_password=user.hashed_password)
+    else:
+        _db_create_user(user.username, user.hashed_password, user.email)
+
+
+def _save_users(users: dict[str, User]):
+    for user in users.values():
+        _save_user(user)
+
+
+def _delete_user(username: str):
+    _db_delete_user(username)
 
 
 # ---------------------------------------------------------------------------
@@ -124,26 +144,22 @@ def _get_current_user(token: str = Depends(oauth2_scheme)) -> User:
 
 @auth_router.post("/register", response_model=Token, status_code=201,operation_id="register")
 def register(user_in: UserCreate):
-    users = _load_users()
-    if user_in.username in users:
+    if _db_get_user(user_in.username):
         raise HTTPException(status_code=400, detail="Username already registered")
 
     hashed_pw = _get_password_hash(user_in.password)
-    user = User(username=user_in.username, email=user_in.email, hashed_password=hashed_pw)
-    users[user.username] = user
-    _save_users(users)
+    _db_create_user(user_in.username, hashed_pw, user_in.email)
 
-    token = _create_access_token({"sub": user.username})
+    token = _create_access_token({"sub": user_in.username})
     return Token(access_token=token)
 
 
 @auth_router.post("/login", response_model=Token,operation_id="login")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    users = _load_users()
-    user = users.get(form_data.username)
-    if user is None or not _verify_password(form_data.password, user.hashed_password):
+    user_row = _db_get_user(form_data.username)
+    if user_row is None or not _verify_password(form_data.password, user_row.hashed_password):
         raise HTTPException(status_code=401, detail="Incorrect username or password")
-    token = _create_access_token({"sub": user.username})
+    token = _create_access_token({"sub": user_row.username})
     return Token(access_token=token)
 
 
@@ -154,30 +170,23 @@ def read_user_me(current_user: User = Depends(_get_current_user)):
 
 @auth_router.put("/users/me", response_model=User, operation_id="update_user_me")
 def update_user_me(update: UserUpdate, current_user: User = Depends(_get_current_user)):
-    users = _load_users()
-    user = users[current_user.username]
-    if update.email is not None:
-        user.email = update.email
-    if update.password is not None:
-        user.hashed_password = _get_password_hash(update.password)
-    users[user.username] = user
-    _save_users(users)
-    return user
+    # Fetch current DB row
+    user_email = update.email if update.email is not None else current_user.email
+    new_hashed = _get_password_hash(update.password) if update.password else current_user.hashed_password
+    _db_update_user(current_user.username, email=user_email, hashed_password=new_hashed)
+    return User(username=current_user.username, email=user_email, hashed_password=new_hashed)
 
 
 @auth_router.delete("/users/me", status_code=204, operation_id="delete_user_me")
 def delete_user_me(current_user: User = Depends(_get_current_user)):
-    users = _load_users()
-    users.pop(current_user.username, None)
-    _save_users(users)
+    _delete_user(current_user.username)
     return None
 
 
 @auth_router.get("/users", response_model=list[User], operation_id="read_users")
 def read_users(current_user: User = Depends(_get_current_user)):
     """Retrieve details of all registered users (requires authentication)."""
-    users = _load_users()
-    return list(users.values())
+    return list(_load_users().values())
 
 
 
