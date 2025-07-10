@@ -154,7 +154,7 @@ def _get_current_user(token: str = Depends(oauth2_scheme)) -> User:
 # API ROUTES
 # ---------------------------------------------------------------------------
 
-@auth_router.post("/register", response_model=Token, status_code=201)
+@auth_router.post("/register", response_model=Token, status_code=201,operation_id="register")
 def register(user_in: UserCreate):
     users = _load_users()
     if user_in.username in users:
@@ -169,7 +169,7 @@ def register(user_in: UserCreate):
     return Token(access_token=token)
 
 
-@auth_router.post("/login", response_model=Token)
+@auth_router.post("/login", response_model=Token,operation_id="login")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
     users = _load_users()
     user = users.get(form_data.username)
@@ -179,12 +179,12 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
     return Token(access_token=token)
 
 
-@auth_router.get("/users/me", response_model=User)
+@auth_router.get("/users/me", response_model=User, operation_id="read_users_me")
 def read_user_me(current_user: User = Depends(_get_current_user)):
     return current_user
 
 
-@auth_router.put("/users/me", response_model=User)
+@auth_router.put("/users/me", response_model=User, operation_id="update_user_me")
 def update_user_me(update: UserUpdate, current_user: User = Depends(_get_current_user)):
     users = _load_users()
     user = users[current_user.username]
@@ -197,7 +197,7 @@ def update_user_me(update: UserUpdate, current_user: User = Depends(_get_current
     return user
 
 
-@auth_router.delete("/users/me", status_code=204)
+@auth_router.delete("/users/me", status_code=204, operation_id="delete_user_me")
 def delete_user_me(current_user: User = Depends(_get_current_user)):
     users = _load_users()
     users.pop(current_user.username, None)
@@ -205,11 +205,29 @@ def delete_user_me(current_user: User = Depends(_get_current_user)):
     return None
 
 
+@auth_router.get("/users", response_model=list[User], operation_id="read_users")
+def read_users(current_user: User = Depends(_get_current_user)):
+    """Retrieve details of all registered users (requires authentication)."""
+    users = _load_users()
+    return list(users.values())
+
+
+@auth_router.get("/users/{username}", response_model=User, operation_id="read_user")
+def read_user(username: str, current_user: User = Depends(_get_current_user)):
+    """Retrieve a specific user by username (requires authentication)."""
+    users = _load_users()
+    user = users.get(username)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+
+
 # ---------------------------------------------------------------------------
 # MIDDLEWARE TO PROTECT /query ENDPOINT
 # ---------------------------------------------------------------------------
 
-def _auth_middleware_factory(app: FastAPI):
+def _auth_middleware_factory(app: FastAPI,operation_id: str):
     """Return middleware function that checks JWT for /query."""
 
     async def auth_middleware(request: Request, call_next):
