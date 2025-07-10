@@ -1,36 +1,4 @@
-"""
-Authentication & user management integration for the existing FastAPI `app` defined in `client.py`.
 
-This module DOES NOT modify any existing application code.  It simply imports the
-already-created `app` instance and augments it with:
-
-• User storage backed by a lightweight JSON file (`users.json`).
-• Password hashing using passlib (bcrypt).
-• JWT authentication using `python-jose`.
-• Routes:  
-    POST  /register      – create user  
-    POST  /login         – obtain JWT token  
-    GET   /users/me      – read current user  
-    PUT   /users/me      – update current user  
-    DELETE /users/me     – delete current user
-• Middleware securing the original `/query` endpoint – it can now be
-  accessed only with a valid JWT token in the `Authorization: Bearer <token>` header.
-
-Usage
------
-Create a new entry-point (e.g. `main.py`):
-
-```
-from client import app  # existing app
-import auth_setup  # noqa: F401 – side-effect: augments `app`
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
-```
-
-Run with `python main.py` or `uvicorn main:app`.
-"""
 from __future__ import annotations
 
 import json
@@ -211,15 +179,6 @@ def read_users(current_user: User = Depends(_get_current_user)):
     users = _load_users()
     return list(users.values())
 
-
-@auth_router.get("/users/{username}", response_model=User, operation_id="read_user")
-def read_user(username: str, current_user: User = Depends(_get_current_user)):
-    """Retrieve a specific user by username (requires authentication)."""
-    users = _load_users()
-    user = users.get(username)
-    if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
 
 
 
