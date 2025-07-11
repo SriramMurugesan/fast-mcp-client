@@ -31,7 +31,7 @@
           "command": "npx",
           "args": [
             "mcp-remote",
-            "http://localhost:8001/mcp",
+            "http://localhost:8000/mcp",
               "--header",
               "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJTcmkiLCJleHAiOjE3NTIyNjMwMTZ9.ieVwgxjHQXeFw29F96BjxvsQIecB7PR-w-QudtKyP38",
               "--header",
