@@ -14,12 +14,10 @@ from fastapi.security import OAuth2PasswordBearer
 
 from llms import AnthropicClient, OpenAIClient, GeminiClient
 
-# Load environment variables
 load_dotenv()
 
 app = FastAPI()
 
-# In-memory conversation store
 conversations: Dict[str, List[Dict]] = {}
 
 class Query(BaseModel):
@@ -120,7 +118,6 @@ class MCPClientManager:
         except Exception as e:
             return f"Error executing tool: {str(e)}"
 
-# Load MCP server configs
 MCP_SERVERS = load_server_configs('server_config.json')
 mcp_client_manager = MCPClientManager(MCP_SERVERS)
 
@@ -217,7 +214,6 @@ async def process_query(query: Query, token: str = Depends(oauth2_scheme)):
 
                 responses.append(f"[Calling tool {tool_name} with args {tool_args}]")
 
-                # 🔗 Manual link injection for drive_share
                 if tool_name == "drive_share" and "fileId" in tool_args:
                     file_id = tool_args["fileId"]
                     link = f"https://drive.google.com/file/d/{file_id}/view?usp=sharing"

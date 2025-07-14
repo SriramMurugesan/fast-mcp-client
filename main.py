@@ -4,13 +4,11 @@ import os
 import sys
 from pathlib import Path
 
-# Add the current directory to Python path
 sys.path.append(str(Path(__file__).parent))
 
 import client
 from client import app
-import auth_setup  # sets up auth middleware
-import db_backend_sqlalchemy  # sets up DB
+import db_backend_sqlalchemy  
 
 from fastapi import Depends
 from fastapi_mcp import FastApiMCP, AuthConfig

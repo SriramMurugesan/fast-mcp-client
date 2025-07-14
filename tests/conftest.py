@@ -15,20 +15,16 @@ def auth_db():
     """
     os.environ["POSTGRES_URL"] = "sqlite:///:memory:"
 
-    # Ensure a clean import so the module picks up the overridden env var.
     if "db_backend_sqlalchemy" in sys.modules:
         del sys.modules["db_backend_sqlalchemy"]
 
     import pathlib
     
-    # Add the project root directory to Python path
     sys.path.append(str(pathlib.Path(__file__).parent.parent))
     import db_backend_sqlalchemy as db_backend
 
-    # Recreate tables for the fresh in-memory database.
     db_backend.Base.metadata.create_all(bind=db_backend.engine)
 
     yield db_backend
 
-    # Teardown – drop all tables (harmless for :memory: but keeps API clear).
     db_backend.Base.metadata.drop_all(bind=db_backend.engine)

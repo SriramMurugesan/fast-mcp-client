@@ -13,10 +13,6 @@ from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr
 from fastapi.responses import JSONResponse
 
-# ---------------------------------------------------------------------------
-# CONFIGURATION
-# ---------------------------------------------------------------------------
-
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "changeme-super-secret")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_SECONDS = 60 * 60 * 24  # 24 hours
@@ -29,9 +25,7 @@ auth_router = APIRouter()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
-# ---------------------------------------------------------------------------
-# MODELS
-# ---------------------------------------------------------------------------
+
 
 class User(BaseModel):
     username: str
@@ -55,9 +49,7 @@ class Token(BaseModel):
     token_type: str = "bearer"
 
 
-# ---------------------------------------------------------------------------
-# STORAGE HELPERS (backed by PostgreSQL via SQLAlchemy)
-# ---------------------------------------------------------------------------
+
 
 from db_backend_sqlalchemy import (
     create_user as _db_create_user,
@@ -94,9 +86,7 @@ def _delete_user(username: str):
     _db_delete_user(username)
 
 
-# ---------------------------------------------------------------------------
-# SECURITY HELPERS
-# ---------------------------------------------------------------------------
+
 
 def _verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
@@ -113,9 +103,7 @@ def _create_access_token(data: dict, expires_delta: int = ACCESS_TOKEN_EXPIRE_SE
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
-# ---------------------------------------------------------------------------
-# DEPENDENCIES
-# ---------------------------------------------------------------------------
+
 
 def _get_current_user(token: str = Depends(oauth2_scheme)) -> User:
     credentials_exception = HTTPException(
@@ -138,9 +126,7 @@ def _get_current_user(token: str = Depends(oauth2_scheme)) -> User:
     return user
 
 
-# ---------------------------------------------------------------------------
-# API ROUTES
-# ---------------------------------------------------------------------------
+
 
 @auth_router.post("/register", response_model=Token, status_code=201,operation_id="register")
 def register(user_in: UserCreate):
@@ -178,7 +164,6 @@ def read_user_me(current_user: User = Depends(_get_current_user)):
 
 @auth_router.put("/users/me", response_model=User, operation_id="update_user_me")
 def update_user_me(update: UserUpdate, current_user: User = Depends(_get_current_user)):
-    # Fetch current DB row
     user_email = update.email if update.email is not None else current_user.email
     new_hashed = _get_password_hash(update.password) if update.password else current_user.hashed_password
     _db_update_user(current_user.username, email=user_email, hashed_password=new_hashed)
@@ -199,22 +184,19 @@ def read_users(current_user: User = Depends(_get_current_user)):
 
 
 
-# ---------------------------------------------------------------------------
-# MIDDLEWARE TO PROTECT /query ENDPOINT
-# ---------------------------------------------------------------------------
+
 
 def _auth_middleware_factory(app: FastAPI):
     """Return middleware function that checks JWT for /query."""
 
     async def auth_middleware(request: Request, call_next):
         if request.url.path.startswith("/query"):
-            # Require Authorization header
             auth_header: str | None = request.headers.get("Authorization")
             if not auth_header or not auth_header.lower().startswith("bearer "):
                 return _unauthorized()
             token = auth_header.split()[1]
             try:
-                _get_current_user(token)  # will raise on error
+                _get_current_user(token)  
             except HTTPException:
                 return _unauthorized()
         return await call_next(request)
@@ -230,14 +212,12 @@ def _unauthorized():
     )
 
 
-# ---------------------------------------------------------------------------
-# PUBLIC SETUP FUNCTION
-# ---------------------------------------------------------------------------
+
 
 def setup_auth(app: FastAPI):
     """Call once to attach router + middleware to an existing FastAPI `app`."""
 
-    # Avoid double-registration
+
     if getattr(app.state, "_auth_setup", False):
         return
 
@@ -247,15 +227,10 @@ def setup_auth(app: FastAPI):
     app.state._auth_setup = True
 
 
-# ---------------------------------------------------------------------------
-# INTEGRATE WITH `client.app` WHEN THIS MODULE IS IMPORTED (side-effect)
-# ---------------------------------------------------------------------------
 
 try:
     from client import app as _existing_app
 
     setup_auth(_existing_app)
 except ModuleNotFoundError:
-    # This module can still be imported standalone, but the user must call
-    # `setup_auth(app)` manually after creating their FastAPI instance.
     pass

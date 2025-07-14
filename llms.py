@@ -98,28 +98,23 @@ class OpenAIClient(LLMClient):
         If the tool was `drive_file_metadata`, synthesise a shareable Google Drive
         link so the assistant can hand it back to the user easily.
         """
-        # Default payload
         content: Any = tool_result.content if hasattr(tool_result, "content") else tool_result
 
-        # Special-case Google Drive files – build a direct view link if we have the ID
         if tool_call.name == "drive_file_metadata":
             try:
                 file_id = None
-                # tool_result may be dict-like or an object with attributes
                 if isinstance(content, dict):
                     file_id = content.get("id") or content.get("fileId")
                 if not file_id and hasattr(content, "id"):
                     file_id = getattr(content, "id")
                 if file_id:
                     view_link = f"https://drive.google.com/file/d/{file_id}/view"
-                    # Embed both ID and link so the assistant can choose
                     content = {
                         **(content if isinstance(content, dict) else {}),
                         "drive_file_id": file_id,
                         "drive_view_link": view_link,
                     }
             except Exception:
-                # Fail gracefully – return original content
                 pass
 
         return {
@@ -192,7 +187,6 @@ class GeminiClient(LLMClient):
 
     async def create_message(self, messages: list) -> dict:
         from google.genai import types
-        # Wrap the function declarations into a Tool and config as per new Gemini API
         tools = types.Tool(function_declarations=self.function_declarations)
         config = types.GenerateContentConfig(tools=[tools])
         response = self.client.models.generate_content(
@@ -205,7 +199,6 @@ class GeminiClient(LLMClient):
     def parse_response(self, response) -> LLMClient.Response:
         text_content = []
         tool_calls = []
-        # Gemini v2 function call responses
         candidates = getattr(response, "candidates", None)
         if candidates and hasattr(candidates[0].content, "parts"):
             parts = candidates[0].content.parts
@@ -221,7 +214,6 @@ class GeminiClient(LLMClient):
                 elif hasattr(part, "text"):
                     text_content.append(part.text)
         else:
-            # fallback: try to extract text
             if hasattr(response, "text"):
                 text_content.append(response.text)
 
