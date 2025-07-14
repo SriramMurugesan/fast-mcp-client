@@ -19,7 +19,11 @@ def auth_db():
     if "db_backend_sqlalchemy" in sys.modules:
         del sys.modules["db_backend_sqlalchemy"]
 
-    db_backend = importlib.import_module("db_backend_sqlalchemy")
+    import pathlib
+    
+    # Add the project root directory to Python path
+    sys.path.append(str(pathlib.Path(__file__).parent.parent))
+    import db_backend_sqlalchemy as db_backend
 
     # Recreate tables for the fresh in-memory database.
     db_backend.Base.metadata.create_all(bind=db_backend.engine)
