@@ -4,7 +4,6 @@ import openai
 from pydantic import BaseModel
 from typing import Dict, List, Optional
 from google import genai
-
 import json
 
 
